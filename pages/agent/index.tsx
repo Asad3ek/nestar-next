@@ -67,6 +67,14 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 			else if (input_obj.sort === 'createdAt' && input_obj.direction === 'ASC') setFilterSortName('Oldest order');
 			else if (input_obj.sort === 'memberLikes') setFilterSortName('Likes');
 			else if (input_obj.sort === 'memberViews') setFilterSortName('Views');
+
+			if (input_obj.search?.text) {
+				setSearchText(input_obj.search.text);
+			} else {
+				setSearchText('');
+			}
+
+			if (input_obj.page) setCurrentPage(input_obj.page);
 		} else
 			router.replace(`/agent?input=${JSON.stringify(searchFilter)}`, `/agent?input=${JSON.stringify(searchFilter)}`);
 
@@ -179,10 +187,11 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 								placeholder={'Search for an agent'}
 								value={searchText}
 								onChange={(e: any) => setSearchText(e.target.value)}
-								onKeyDown={(event: any) => {
+								onKeyDown={async (event: any) => {
 									if (event.key == 'Enter') {
 										setSearchFilter({
 											...searchFilter,
+											page: 1,
 											search: { ...searchFilter.search, text: searchText },
 										});
 									}
