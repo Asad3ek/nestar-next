@@ -1,4 +1,4 @@
-import React, { ChangeEvent, MouseEvent, useEffect, useState } from 'react';
+import React, { ChangeEvent, MouseEvent, useCallback, useEffect, useState } from 'react';
 import { NextPage } from 'next';
 import useDeviceDetect from '../../libs/hooks/useDeviceDetect';
 import withLayoutBasic from '../../libs/components/layout/LayoutBasic';
@@ -15,6 +15,7 @@ import { GET_AGENTS } from '../../apollo/user/query';
 import { T } from '../../libs/types/common';
 import { sweetMixinErrorAlert, sweetTopSmallSuccessAlert } from '../../libs/sweetAlert';
 import { Messages } from '../../libs/config';
+import { AgentsInquiry } from '../../libs/types/member/member.input';
 
 export const getStaticProps = async ({ locale }: any) => ({
 	props: {
@@ -57,26 +58,30 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 
 	/** LIFECYCLES **/
 	useEffect(() => {
+		if (!router.isReady) return;
+
 		if (router.query.input) {
 			const input_obj = JSON.parse(router?.query?.input as string);
 			setSearchFilter(input_obj);
+			if (input_obj.sort === 'createdAt' && input_obj.direction === 'DESC') setFilterSortName('Recent');
+			else if (input_obj.sort === 'createdAt' && input_obj.direction === 'ASC') setFilterSortName('Oldest order');
+			else if (input_obj.sort === 'memberLikes') setFilterSortName('Likes');
+			else if (input_obj.sort === 'memberViews') setFilterSortName('Views');
 		} else
 			router.replace(`/agent?input=${JSON.stringify(searchFilter)}`, `/agent?input=${JSON.stringify(searchFilter)}`);
 
 		setCurrentPage(searchFilter.page === undefined ? 1 : searchFilter.page);
-	}, [router]);
+	}, [router.isReady, router.query.input]);
 
 	/** HANDLERS **/
 	const likeAgentHandler = async (user: T, id: string) => {
 		try {
 			if (!id) return;
 			if (!user._id) throw new Error(Messages.error2)
-			//Execute likeTargetProperty mutation
 			await likeTargetProperty({
 				variables: { input: id }
 			});
 
-			//refetch getProperties
 			await getAgentsRefetch({ input: searchFilter })
 
 			await sweetTopSmallSuccessAlert('success', 800)
@@ -97,28 +102,58 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 		setAnchorEl(null);
 	};
 
-	const sortingHandler = (e: React.MouseEvent<HTMLLIElement>) => {
-		switch (e.currentTarget.id) {
-			case 'recent':
-				setSearchFilter({ ...searchFilter, sort: 'createdAt', direction: 'DESC' });
-				setFilterSortName('Recent');
-				break;
-			case 'old':
-				setSearchFilter({ ...searchFilter, sort: 'createdAt', direction: 'ASC' });
-				setFilterSortName('Oldest order');
-				break;
-			case 'likes':
-				setSearchFilter({ ...searchFilter, sort: 'memberLikes', direction: 'DESC' });
-				setFilterSortName('Likes');
-				break;
-			case 'views':
-				setSearchFilter({ ...searchFilter, sort: 'memberViews', direction: 'DESC' });
-				setFilterSortName('Views');
-				break;
-		}
-		setSortingOpen(false);
-		setAnchorEl2(null);
-	};
+	const sortingHandler = useCallback(
+		async (e: React.MouseEvent<HTMLLIElement>) => {
+			try {
+				const id = e.currentTarget.id;
+				let sort = 'createdAt';
+				let direction = 'DESC';
+
+				switch (id) {
+					case 'recent':
+						sort = 'createdAt';
+						direction = 'DESC';
+						setFilterSortName('Recent');
+						break;
+					case 'old':
+						sort = 'createdAt';
+						direction = 'ASC';
+						setFilterSortName('Oldest order');
+						break;
+					case 'likes':
+						sort = 'memberLikes';
+						direction = 'DESC';
+						setFilterSortName('Likes');
+						break;
+					case 'views':
+						sort = 'memberViews';
+						direction = 'DESC';
+						setFilterSortName('Views');
+						break;
+					default:
+						break;
+				}
+
+				const updatedSearchFilter = {
+					...searchFilter,
+					page: 1,
+					sort: sort,
+					direction: direction,
+				};
+
+				await router.push(
+					`/agent?input=${JSON.stringify(updatedSearchFilter)}`,
+					`/agent?input=${JSON.stringify(updatedSearchFilter)}`,
+					{ scroll: false },
+				);
+
+				sortingCloseHandler();
+			} catch (err: any) {
+				console.log('ERROR, sortingHandler:', err);
+			}
+		},
+		[searchFilter, router], // Qaramliklar to'g'rilandi
+	);
 
 	const paginationChangeHandler = async (event: ChangeEvent<unknown>, value: number) => {
 		searchFilter.page = value;
@@ -127,6 +162,9 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 		});
 		setCurrentPage(value);
 	};
+
+
+
 
 	if (device === 'mobile') {
 		return <h1>AGENTS PAGE MOBILE</h1>;
@@ -157,7 +195,10 @@ const AgentList: NextPage = ({ initialInput, ...props }: any) => {
 								<Button onClick={sortingClickHandler} endIcon={<KeyboardArrowDownRoundedIcon />}>
 									{filterSortName}
 								</Button>
-								<Menu anchorEl={anchorEl} open={sortingOpen} onClose={sortingCloseHandler} sx={{ paddingTop: '5px' }}>
+								<Menu
+									anchorEl={anchorEl}
+									open={sortingOpen}
+									onClose={sortingCloseHandler} sx={{ paddingTop: '5px' }}>
 									<MenuItem onClick={sortingHandler} id={'recent'} disableRipple>
 										Recent
 									</MenuItem>
