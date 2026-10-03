@@ -37,7 +37,7 @@ const TuiEditor = () => {
 			const articleContent = editor?.getInstance().getHTML() as string;
 			memoizedValues.articleContent = articleContent;
 
-			if (memoizedValues.articleContent === '' && memoizedValues.articleTitle === '') {
+			if ((!memoizedValues.articleContent || !memoizedValues.articleTitle || !articleCategory)) {
 				throw new Error(Message.INSERT_ALL_INPUTS);
 			}
 
